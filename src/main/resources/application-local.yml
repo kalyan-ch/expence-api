@@ -1,0 +1,13 @@
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/expence
+    username: developer
+    password: postgresDev
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    locations: classpath:db/migration
+
+app:
+  cors:
+    allowed-origins: http://localhost:3000

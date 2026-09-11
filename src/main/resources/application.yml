@@ -1,0 +1,15 @@
+
+spring:
+  application:
+    name: expenceApi
+  profiles:
+    active: local
+  jpa:
+    show-sql: false
+    hibernate:
+      # Flyway owns the schema. Hibernate only checks the entities match it and never
+      # writes DDL, so the database can never drift from the migrations.
+      ddl-auto: validate
+
+server:
+  port: ${PORT:8080}

@@ -1,0 +1,11 @@
+
+# Only what must differ from the local profile. The datasource is deliberately absent:
+# @ServiceConnection on the Testcontainers Postgres in AbstractIntegrationTest supplies
+# the URL, user and password, so the suite never points at the local dev database.
+spring:
+  flyway:
+    locations: classpath:db/migration
+
+app:
+  cors:
+    allowed-origins: http://localhost:3000
