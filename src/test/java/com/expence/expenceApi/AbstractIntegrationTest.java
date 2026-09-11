@@ -5,7 +5,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * Base class for every integration test. Extending it gives the test a real Postgres
@@ -26,16 +26,17 @@ import org.testcontainers.containers.PostgreSQLContainer;
 public abstract class AbstractIntegrationTest {
 
 	@ServiceConnection
-	static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16.4-alpine");
+	static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16.4-alpine");
 
 	static {
 		POSTGRES.start();
 	}
 
 	/**
-	 * Flyway is forced on because the migrations are the schema {@code ddl-auto: validate}
-	 * checks the entities against — running the suite without them would validate against
-	 * an empty database. It also means a broken migration fails the build.
+	 * Flyway is on by default and nothing here turns it off; this pins it so a later
+	 * profile cannot. The migrations are the schema {@code ddl-auto: validate} checks the
+	 * entities against — without them the suite would validate against an empty database,
+	 * and a broken migration would stop failing the build.
 	 */
 	@DynamicPropertySource
 	static void flywayProperties(DynamicPropertyRegistry registry) {

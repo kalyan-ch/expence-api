@@ -13,3 +13,9 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+app:
+  cors:
+    # Single-user local app: the UI is always Next.js on :3000. True in every profile,
+    # so it lives here rather than being repeated per profile.
+    allowed-origins: http://localhost:3000
