@@ -39,6 +39,9 @@ dependencies {
 	// gen_random_uuid(), a plpgsql trigger and multi-column CHECK constraints that
 	// H2 cannot reproduce, and Flyway stays on so the migrations are exercised too.
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	// Boot 4.1 moved MockMvc's test slice out of spring-boot-test-autoconfigure into its
+	// own module, so spring-boot-starter-test alone no longer provides @AutoConfigureMockMvc.
+	testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	// Testcontainers 2.x (2.0.5, pinned by the Spring Boot 4.1.0 BOM) prefixes every
 	// module artifact with 'testcontainers-'. The spec's 'org.testcontainers:postgresql'
