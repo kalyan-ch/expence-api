@@ -6,7 +6,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * The browser calls this API directly at :8080 — there is no Next.js proxy layer — so
+ * The browser calls this API directly (see {@code server.port}) — there is no Next.js proxy layer — so
  * every UI request is cross-origin and needs CORS.
  *
  * <p>The origins come from {@code app.cors.allowed-origins} rather than being hardcoded

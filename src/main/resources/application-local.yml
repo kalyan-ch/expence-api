@@ -1,7 +1,7 @@
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/expence
+    url: jdbc:postgresql://localhost:5433/expence
     username: developer
     password: postgresDev
     driver-class-name: org.postgresql.Driver
