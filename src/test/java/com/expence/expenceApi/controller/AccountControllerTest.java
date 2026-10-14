@@ -10,7 +10,7 @@ import com.expence.expenceApi.model.finance.Category;
 import com.expence.expenceApi.model.finance.CategoryKind;
 import com.expence.expenceApi.model.finance.Transaction;
 import com.expence.expenceApi.model.finance.TransactionType;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

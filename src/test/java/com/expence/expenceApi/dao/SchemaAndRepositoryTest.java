@@ -58,14 +58,16 @@ class SchemaAndRepositoryTest extends AbstractIntegrationTest {
 	@Test
 	@DisplayName("seeds three income and nine expense default categories")
 	void seedsTwelveDefaultCategories() {
-		List<Category> income = categoryRepository.findAllByKindOrderByNameAsc(CategoryKind.INCOME);
-		List<Category> expense = categoryRepository.findAllByKindOrderByNameAsc(CategoryKind.EXPENSE);
+		// Other suites share this database and leave custom categories behind; count defaults only.
+		List<Category> income = categoryRepository.findAllByKindOrderByNameAsc(CategoryKind.INCOME)
+				.stream().filter(Category::isDefault).toList();
+		List<Category> expense = categoryRepository.findAllByKindOrderByNameAsc(CategoryKind.EXPENSE)
+				.stream().filter(Category::isDefault).toList();
 
-		assertThat(income).hasSize(3).allMatch(Category::isDefault);
-		assertThat(expense).hasSize(9).allMatch(Category::isDefault);
+		assertThat(income).hasSize(3);
+		assertThat(expense).hasSize(9);
 		assertThat(income).extracting(Category::getName)
 				.containsExactly("Interest", "Other Income", "Salary");
-		assertThat(categoryRepository.findAllByOrderByKindAscNameAsc()).hasSize(12);
 
 		// A name is unique only within its kind, and matching ignores case.
 		Category other = expense.stream().filter(c -> c.getName().equals("Other")).findFirst().orElseThrow();

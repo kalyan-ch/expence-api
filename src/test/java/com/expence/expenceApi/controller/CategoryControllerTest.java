@@ -10,12 +10,13 @@ import com.expence.expenceApi.model.finance.Category;
 import com.expence.expenceApi.model.finance.CategoryKind;
 import com.expence.expenceApi.model.finance.Transaction;
 import com.expence.expenceApi.model.finance.TransactionType;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -30,6 +31,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Rolled back so wiping the Flyway seed below never leaks into other suites.
+@Transactional
 @AutoConfigureMockMvc
 class CategoryControllerTest extends AbstractIntegrationTest {
 
@@ -45,9 +48,10 @@ class CategoryControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void seed() {
         // Replace the Flyway seed with a known two-category set so counts are exact.
-        transactionRepository.deleteAll();
-        categoryRepository.deleteAll();
-        accountRepository.deleteAll();
+        // Bulk deletes run immediately; deleteAll() would queue behind the inserts below and hit UNIQUE.
+        transactionRepository.deleteAllInBatch();
+        categoryRepository.deleteAllInBatch();
+        accountRepository.deleteAllInBatch();
         groceries = categoryRepository.save(Category.builder()
                 .name("Groceries").kind(CategoryKind.EXPENSE).isDefault(true).build());
         salary = categoryRepository.save(Category.builder()

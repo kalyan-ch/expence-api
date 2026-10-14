@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,11 +45,6 @@ class GlobalExceptionHandlerTest extends AbstractIntegrationTest {
             public void byId(@PathVariable UUID id) {
                 // reached only when UUID parses; the handler matters when it doesn't
             }
-        }
-
-        @Bean
-        TestController testController() {
-            return new TestController();
         }
     }
 

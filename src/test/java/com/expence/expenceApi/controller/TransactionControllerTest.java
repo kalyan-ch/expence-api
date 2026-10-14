@@ -10,7 +10,7 @@ import com.expence.expenceApi.model.finance.Category;
 import com.expence.expenceApi.model.finance.CategoryKind;
 import com.expence.expenceApi.model.finance.Transaction;
 import com.expence.expenceApi.model.finance.TransactionType;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -112,16 +112,13 @@ class TransactionControllerTest extends AbstractIntegrationTest {
 
     @Test
     void incomeWithExpenseCategoryReturns409() throws Exception {
-        Category expense = categoryRepository.save(Category.builder()
-                .name("Groceries").kind(CategoryKind.EXPENSE).isDefault(false).build());
-
         mockMvc.perform(post("/api/transactions")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(
-                                body(checking, expense, "10.00", TransactionType.INCOME, LocalDate.now()))))
+                                body(checking, groceries, "10.00", TransactionType.INCOME, LocalDate.now()))))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message")
-                        .value("Category 'Groceries' is an expense category and cannot be used on an income transaction"));
+                .andExpect(jsonPath("$.message").value("Category '" + groceries.getName()
+                        + "' is an expense category and cannot be used on an income transaction"));
     }
 
     @Test
