@@ -24,4 +24,5 @@ public class AccountDTO {
     private AccountType type;
     private BigDecimal openingBalance;
     private BigDecimal balance;
+    private boolean paymentAccount;
 }

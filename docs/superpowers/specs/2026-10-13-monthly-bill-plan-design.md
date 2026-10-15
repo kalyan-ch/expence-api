@@ -52,6 +52,7 @@ Out of scope for now:
 ## Data model
 
 Reuse the `accounts` table for Chase and DCU, with type CHECKING. Its opening balance is not used by this feature.
+Payment accounts (user request, 2026-10-14): an account flagged `payment_account` is one bills are paid from and paychecks land in. Only flagged accounts appear in bill account dropdowns, and the API rejects a bill on any other account (400). An item keeps its current account if that account is later unflagged.
 
 New tables:
 
@@ -98,8 +99,8 @@ Done by the API and returned with each month:
 
 - **Recurring items:** list, create, update, retire. Deleting is allowed only if no month uses the item; otherwise it returns 409.
 - **Months:**
-  - Create a month. It copies every active recurring item with its default amount and account.
   - Fetch one month: items sorted by billing day, starting balances, and every calculated total.
+    Fetching a month that doesn't exist yet creates it, copying every active recurring item with its default amount and account (user decision, 2026-10-14; replaces a separate create endpoint).
   - List months that exist, for the switcher.
 - **Month items:**
   - Update amount, account, status or billing day.

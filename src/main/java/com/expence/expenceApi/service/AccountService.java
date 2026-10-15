@@ -49,6 +49,17 @@ public class AccountService {
                 .orElseThrow(() -> new NotFoundException("Account not found"));
     }
 
+    /** Keeping an item's current account is always allowed, even if it stopped being a payment account. */
+    @Transactional(readOnly = true)
+    public Account requirePayment(UUID id, Account current) {
+        if (current != null && current.getId().equals(id)) return current;
+        Account account = require(id);
+        if (!account.isPaymentAccount()) {
+            throw new IllegalArgumentException("'" + account.getName() + "' is not a payment account");
+        }
+        return account;
+    }
+
     @Transactional(readOnly = true)
     public BigDecimal totalBalance() {
         return list().stream()
@@ -66,6 +77,7 @@ public class AccountService {
                 .name(name)
                 .type(request.getType())
                 .openingBalance(request.getOpeningBalance())
+                .paymentAccount(Boolean.TRUE.equals(request.getPaymentAccount()))
                 .build();
         account = accountRepository.save(account);
         return toDto(account, BigDecimal.ZERO);
@@ -81,6 +93,7 @@ public class AccountService {
         account.setName(name);
         account.setType(request.getType());
         account.setOpeningBalance(request.getOpeningBalance());
+        account.setPaymentAccount(Boolean.TRUE.equals(request.getPaymentAccount()));
         account = accountRepository.save(account);
         BigDecimal sum = transactionRepository.sumByAccountId(id);
         return toDto(account, sum);
@@ -105,6 +118,7 @@ public class AccountService {
                 .type(account.getType())
                 .openingBalance(opening)
                 .balance(opening.add(sum))
+                .paymentAccount(account.isPaymentAccount())
                 .build();
     }
 }

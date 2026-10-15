@@ -86,6 +86,19 @@ class AccountControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void paymentAccountFlagDefaultsOffAndCanBeSet() throws Exception {
+        mockMvc.perform(post("/api/accounts").contentType("application/json")
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Visa", "type", "CREDIT_CARD", "openingBalance", 0))))
+                .andExpect(jsonPath("$.paymentAccount").value(false));
+        mockMvc.perform(post("/api/accounts").contentType("application/json")
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Chase", "type", "CHECKING", "openingBalance", 0, "paymentAccount", true))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.paymentAccount").value(true));
+    }
+
+    @Test
     void accountWithNoActivityListsAtOpeningBalance() throws Exception {
         Account account = accountRepository.save(Account.builder()
                 .name("Savings").type(AccountType.SAVINGS).openingBalance(new BigDecimal("250")).build());

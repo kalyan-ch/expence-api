@@ -28,4 +28,7 @@ public class AccountRequest {
     @NotNull
     @Digits(integer = 15, fraction = 4)
     private BigDecimal openingBalance;
+
+    /** Null means false. */
+    private Boolean paymentAccount;
 }

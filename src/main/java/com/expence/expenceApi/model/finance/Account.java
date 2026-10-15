@@ -45,6 +45,10 @@ public class Account {
 	@Column(name = "opening_balance")
 	private BigDecimal openingBalance;
 
+	/** Bills and paychecks can only be assigned to a payment account. */
+	@Column(name = "payment_account")
+	private boolean paymentAccount;
+
 	/** Maintained by Postgres (column DEFAULT); Hibernate only reads it back. */
 	@Column(name = "created_at", insertable = false, updatable = false)
 	private Instant createdAt;
