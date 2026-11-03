@@ -1,5 +1,6 @@
 package com.expence.expenceApi.model.finance.rest;
 
+import com.expence.expenceApi.model.finance.ItemFrequency;
 import com.expence.expenceApi.model.finance.ItemKind;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
@@ -14,12 +15,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
  * Body for creating or updating a recurring bill or paycheck. {@code defaultAmount} and
  * {@code billingDay} may be null: a blank cell in the sheet. {@code sortOrder} and
  * {@code active} are optional; null keeps the current value (0 and true on create).
+ * {@code frequency} works the same way (MONTHLY on create); {@code secondDay} and
+ * {@code anchorDate} are required by TWICE_MONTHLY and BIWEEKLY/WEEKLY respectively.
  */
 @Data
 @Builder
@@ -45,7 +49,14 @@ public class RecurringItemRequest {
     @Max(31)
     private Integer billingDay;
 
+    private ItemFrequency frequency;
+    @Min(1)
+    @Max(31)
+    private Integer secondDay;
+    private LocalDate anchorDate;
     private Integer sortOrder;
 
     private Boolean active;
+    /** Null keeps the current choice, or the kind's default on create. */
+    private Boolean inExpenditure;
 }

@@ -81,7 +81,50 @@ class RecurringItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.accountName").value(chase.getName()))
                 .andExpect(jsonPath("$.defaultAmount").value(2010.82))
                 .andExpect(jsonPath("$.billingDay").value(1))
+                .andExpect(jsonPath("$.frequency").value("MONTHLY"))
+                .andExpect(jsonPath("$.inExpenditure").value(true))
                 .andExpect(jsonPath("$.active").value(true));
+    }
+
+    @Test
+    void expenditureDefaultsByKindAndNeverIncludesPay() throws Exception {
+        mockMvc.perform(post("/api/recurring-items").contentType("application/json")
+                        .content(json(body("Marcus", ItemKind.SAVINGS, "500", 3))))
+                .andExpect(jsonPath("$.inExpenditure").value(false));
+
+        var pay = body("Salary", ItemKind.INCOME, "1985.72", 1);
+        pay.put("inExpenditure", true);
+        mockMvc.perform(post("/api/recurring-items").contentType("application/json").content(json(pay)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.inExpenditure").value(false));
+    }
+
+    @Test
+    void biweeklyKeepsItsAnchorAndDropsTheFixedDay() throws Exception {
+        var body = body("Paycheck", ItemKind.INCOME, "1985.72", 5);
+        body.put("frequency", "BIWEEKLY");
+        body.put("anchorDate", "2026-10-02");
+        mockMvc.perform(post("/api/recurring-items").contentType("application/json").content(json(body)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.frequency").value("BIWEEKLY"))
+                .andExpect(jsonPath("$.anchorDate").value("2026-10-02"))
+                .andExpect(jsonPath("$.billingDay").doesNotExist());
+    }
+
+    @Test
+    void scheduleMissingItsDaysReturns400() throws Exception {
+        var biweekly = body("Paycheck", ItemKind.INCOME, "1985.72", null);
+        biweekly.put("frequency", "BIWEEKLY");
+        mockMvc.perform(post("/api/recurring-items").contentType("application/json").content(json(biweekly)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Pick a recent payday to count the weeks from"));
+
+        var twice = body("Paycheck", ItemKind.INCOME, "1985.72", 15);
+        twice.put("frequency", "TWICE_MONTHLY");
+        twice.put("secondDay", 15);
+        mockMvc.perform(post("/api/recurring-items").contentType("application/json").content(json(twice)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Twice a month needs two different days"));
     }
 
     @Test

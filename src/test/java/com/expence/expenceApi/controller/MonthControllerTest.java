@@ -7,6 +7,7 @@ import com.expence.expenceApi.dao.PlanMonthRepository;
 import com.expence.expenceApi.dao.RecurringItemRepository;
 import com.expence.expenceApi.model.finance.Account;
 import com.expence.expenceApi.model.finance.AccountType;
+import com.expence.expenceApi.model.finance.ItemFrequency;
 import com.expence.expenceApi.model.finance.ItemKind;
 import com.expence.expenceApi.model.finance.MonthBalance;
 import com.expence.expenceApi.model.finance.RecurringItem;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -74,7 +76,8 @@ class MonthControllerTest extends AbstractIntegrationTest {
 
     private RecurringItem bill(String name, ItemKind kind, Account account, String amount, Integer day) {
         return recurringItemRepository.save(RecurringItem.builder().name(name).kind(kind).account(account)
-                .defaultAmount(amount == null ? null : new BigDecimal(amount)).billingDay(day).sortOrder(order++).build());
+                .defaultAmount(amount == null ? null : new BigDecimal(amount)).billingDay(day)
+                .inExpenditure(kind.inExpenditure(null, null)).sortOrder(order++).build());
     }
 
     private void balance(String month, Account account, String amount) {
@@ -133,6 +136,70 @@ class MonthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.expenditure").value(3253.47));
     }
 
+    private void paycheck(ItemFrequency frequency, Integer day, Integer secondDay, LocalDate anchor) {
+        recurringItemRepository.save(RecurringItem.builder().name("Paycheck").kind(ItemKind.INCOME).account(chase)
+                .defaultAmount(new BigDecimal("1000")).frequency(frequency).billingDay(day).secondDay(secondDay)
+                .anchorDate(anchor).sortOrder(order++).build());
+    }
+
+    private static final String PAYDAYS = "$.items[?(@.name == 'Paycheck')].billingDay";
+
+    @Test
+    void biweeklyPaycheckLandsOnEveryPaydayOfTheMonth() throws Exception {
+        paycheck(ItemFrequency.BIWEEKLY, null, null, LocalDate.of(2026, 9, 18));
+
+        // Every other Friday from Sep 18: three in October, two in November.
+        mockMvc.perform(get("/api/months/2026-10"))
+                .andExpect(jsonPath(PAYDAYS, contains(2, 16, 30)))
+                .andExpect(jsonPath("$.accounts[0].income").value(6971.44));
+        mockMvc.perform(get("/api/months/2026-11")).andExpect(jsonPath(PAYDAYS, contains(13, 27)));
+    }
+
+    @Test
+    void weeklyPaycheckCountsFromAFutureAnchorToo() throws Exception {
+        paycheck(ItemFrequency.WEEKLY, null, null, LocalDate.of(2026, 12, 4));
+
+        mockMvc.perform(get("/api/months/2026-10")).andExpect(jsonPath(PAYDAYS, contains(2, 9, 16, 23, 30)));
+    }
+
+    @Test
+    void twiceMonthlyPaycheckLandsOnBothDays() throws Exception {
+        paycheck(ItemFrequency.TWICE_MONTHLY, 15, 31, null);
+
+        mockMvc.perform(get("/api/months/2027-02")).andExpect(jsonPath(PAYDAYS, contains(15, 31)));
+    }
+
+    @Test
+    void anEmptyMonthIsFilledOnceThereAreBills() throws Exception {
+        var all = recurringItemRepository.findAll();
+        all.forEach(r -> r.setActive(false));
+        recurringItemRepository.saveAll(all);
+        mockMvc.perform(get("/api/months/2026-12")).andExpect(jsonPath("$.items", hasSize(0)));
+
+        all.forEach(r -> r.setActive(true));
+        recurringItemRepository.saveAll(all);
+        mockMvc.perform(get("/api/months/2026-12")).andExpect(jsonPath("$.items", hasSize(12)));
+    }
+
+    @Test
+    void aPaycheckAddedLaterJoinsOpenMonthsFromNowOnButNotPastOnes() throws Exception {
+        mockMvc.perform(get("/api/months/2099-01")).andExpect(jsonPath("$.items", hasSize(12)));
+        mockMvc.perform(get("/api/months/2020-01")).andExpect(jsonPath("$.items", hasSize(12)));
+
+        var pay = item("Paycheck", ItemKind.INCOME, chase, "1985.72", 15);
+        pay.remove("amount");
+        pay.put("defaultAmount", "1985.72");
+        pay.put("frequency", "TWICE_MONTHLY");
+        pay.put("secondDay", 30);
+        mockMvc.perform(post("/api/recurring-items").contentType("application/json").content(json(pay)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/months/2099-01"))
+                .andExpect(jsonPath(PAYDAYS, contains(15, 30)))
+                .andExpect(jsonPath("$.items", hasSize(14)));
+        mockMvc.perform(get("/api/months/2020-01")).andExpect(jsonPath("$.items", hasSize(12)));
+    }
+
     @Test
     void listReturnsExpenditureOldestFirst() throws Exception {
         mockMvc.perform(get("/api/months/2026-10"));
@@ -189,6 +256,26 @@ class MonthControllerTest extends AbstractIntegrationTest {
                         .content("{\"startingBalance\": 1}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Account not found"));
+    }
+
+    @Test
+    void eachBillChoosesWhetherItCountsTowardExpenditure() throws Exception {
+        var amex = item("Amex Card", ItemKind.CARD_PAYMENT, dcu, "433.14", 27);
+        amex.put("inExpenditure", false);
+        mockMvc.perform(put("/api/months/2026-10/items/" + itemId("Amex Card")).contentType("application/json").content(json(amex)))
+                .andExpect(jsonPath("$.total").value(3633.28))
+                .andExpect(jsonPath("$.expenditure").value(3200.14));
+
+        // Left out, the choice is kept rather than reset to the kind's default.
+        amex.remove("inExpenditure");
+        amex.put("status", "PAID");
+        mockMvc.perform(put("/api/months/2026-10/items/" + itemId("Amex Card")).contentType("application/json").content(json(amex)))
+                .andExpect(jsonPath("$.expenditure").value(3200.14));
+
+        var marcus = item("Marcus", ItemKind.SAVINGS, chase, "500", 3);
+        marcus.put("inExpenditure", true);
+        mockMvc.perform(post("/api/months/2026-10/items").contentType("application/json").content(json(marcus)))
+                .andExpect(jsonPath("$.expenditure").value(3700.14));
     }
 
     @Test

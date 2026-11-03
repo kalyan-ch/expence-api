@@ -3,6 +3,7 @@ package com.expence.expenceApi.dao;
 import com.expence.expenceApi.AbstractIntegrationTest;
 import com.expence.expenceApi.model.finance.Account;
 import com.expence.expenceApi.model.finance.AccountType;
+import com.expence.expenceApi.model.finance.ItemFrequency;
 import com.expence.expenceApi.model.finance.ItemKind;
 import com.expence.expenceApi.model.finance.ItemStatus;
 import com.expence.expenceApi.model.finance.MonthBalance;
@@ -91,12 +92,24 @@ class PlanSchemaTest extends AbstractIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("a recurring item is copied into a month at most once")
-	void recurringItemOncePerMonth() {
+	@DisplayName("a recurring item is copied into a month at most once per day; one-off rows are not limited")
+	void recurringItemOncePerDay() {
 		RecurringItem rent = rent();
 		monthItemRepository.saveAndFlush(item().recurringItem(rent).build());
+		monthItemRepository.saveAndFlush(item().recurringItem(rent).billingDay(15).build());
+		monthItemRepository.saveAndFlush(item().build());
+		monthItemRepository.saveAndFlush(item().build());
 
 		assertThatThrownBy(() -> monthItemRepository.saveAndFlush(item().recurringItem(rent).build()))
+				.isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	@DisplayName("a biweekly item needs an anchor payday and no fixed day")
+	void frequencyShape() {
+		assertThatThrownBy(() -> recurringItemRepository.saveAndFlush(RecurringItem.builder()
+				.name("Paycheck " + UUID.randomUUID()).kind(ItemKind.INCOME).account(chase)
+				.frequency(ItemFrequency.BIWEEKLY).billingDay(5).build()))
 				.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
