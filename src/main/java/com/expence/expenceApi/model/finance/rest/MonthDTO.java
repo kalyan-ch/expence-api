@@ -50,6 +50,7 @@ public class MonthDTO {
         private String accountName;
         private BigDecimal amount;
         private Integer billingDay;
+        private boolean inExpenditure;
         private int sortOrder;
         private ItemStatus status;
         private LocalDate paidOn;

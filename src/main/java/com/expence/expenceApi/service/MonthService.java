@@ -38,7 +38,6 @@ import java.util.stream.Stream;
 public class MonthService {
 
     private static final Set<ItemKind> OUTGOING = Set.of(ItemKind.EXPENSE, ItemKind.CARD_PAYMENT, ItemKind.SAVINGS);
-    private static final Set<ItemKind> SPENDING = Set.of(ItemKind.EXPENSE, ItemKind.CARD_PAYMENT);
 
     private static final Comparator<MonthItem> BY_BILLING_DAY = Comparator
             .comparing(MonthItem::getBillingDay, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -50,7 +49,7 @@ public class MonthService {
     private final RecurringItemRepository recurringItemRepository;
     private final AccountService accountService;
 
-    /** Opening a month that doesn't exist yet starts it from the active recurring items. */
+    /** Opening a month that doesn't exist yet, or has no rows, starts it from the active recurring items. */
     @Transactional
     public MonthDTO get(YearMonth month) {
         return view(plan(month));
@@ -91,8 +90,15 @@ public class MonthService {
         return view(plan);
     }
 
+    /**
+     * An empty month (opened before any bills were set up, or emptied by hand) is filled again,
+     * since there is nothing in it to lose.
+     */
     private PlanMonth plan(YearMonth month) {
-        return planMonthRepository.findByMonth(month.atDay(1)).orElseGet(() -> start(month));
+        PlanMonth plan = planMonthRepository.findByMonth(month.atDay(1))
+                .orElseGet(() -> planMonthRepository.save(PlanMonth.builder().month(month.atDay(1)).build()));
+        if (!monthItemRepository.existsByPlanMonthId(plan.getId())) copyRecurring(plan);
+        return plan;
     }
 
     private MonthItem requireItem(YearMonth month, UUID id) {
@@ -109,6 +115,7 @@ public class MonthService {
         item.setAccount(accountService.requirePayment(request.getAccountId(), item.getAccount()));
         item.setAmount(request.getAmount());
         item.setBillingDay(request.getBillingDay());
+        item.setInExpenditure(item.getKind().inExpenditure(request.getInExpenditure(), item.getId() == null ? null : item.isInExpenditure()));
         item.setStatus(paid ? ItemStatus.PAID : ItemStatus.PENDING);
         item.setPaidOn(!paid ? null : request.getPaidOn() != null ? request.getPaidOn() : LocalDate.now());
     }
@@ -122,7 +129,7 @@ public class MonthService {
                 .items(items.stream().sorted(BY_BILLING_DAY).map(MonthService::toDto).toList())
                 .accounts(accountTotals(items, balances))
                 .total(sum(items, i -> OUTGOING.contains(i.getKind())))
-                .expenditure(sum(items, i -> SPENDING.contains(i.getKind())))
+                .expenditure(sum(items, MonthItem::isInExpenditure))
                 .unpaidCount((int) items.stream().filter(MonthService::isDue).count())
                 .unpaidTotal(sum(items, MonthService::isDue))
                 .build();
@@ -136,27 +143,41 @@ public class MonthService {
             return MonthSummaryDTO.builder()
                     .month(YearMonth.from(plan.getMonth()))
                     .total(sum(items, i -> OUTGOING.contains(i.getKind())))
-                    .expenditure(sum(items, i -> SPENDING.contains(i.getKind())))
+                    .expenditure(sum(items, MonthItem::isInExpenditure))
                     .build();
         }).toList();
     }
 
-    private PlanMonth start(YearMonth month) {
-        PlanMonth plan = planMonthRepository.save(PlanMonth.builder().month(month.atDay(1)).build());
-        monthItemRepository.saveAll(recurringItemRepository.findAllByOrderBySortOrderAscNameAsc().stream()
-                .filter(RecurringItem::isActive)
-                .map(r -> MonthItem.builder()
+    /**
+     * A bill or paycheck added after a month was opened joins it too, from this month on,
+     * so setting up pay mid-month shows in the current plan. Past months stay as they were.
+     */
+    @Transactional
+    public void addToOpenMonths(RecurringItem item) {
+        if (!item.isActive()) return;
+        planMonthRepository.findAllByMonthGreaterThanEqual(YearMonth.now().atDay(1))
+                .forEach(plan -> copy(plan, List.of(item)));
+    }
+
+    private void copyRecurring(PlanMonth plan) {
+        copy(plan, recurringItemRepository.findAllByOrderBySortOrderAscNameAsc().stream().filter(RecurringItem::isActive).toList());
+    }
+
+    private void copy(PlanMonth plan, List<RecurringItem> items) {
+        YearMonth month = YearMonth.from(plan.getMonth());
+        monthItemRepository.saveAll(items.stream()
+                .flatMap(r -> r.daysIn(month).stream().map(day -> MonthItem.builder()
                         .planMonth(plan)
                         .recurringItem(r)
                         .name(r.getName())
                         .kind(r.getKind())
                         .account(r.getAccount())
                         .amount(r.getDefaultAmount())
-                        .billingDay(r.getBillingDay())
+                        .billingDay(day)
+                        .inExpenditure(r.isInExpenditure())
                         .sortOrder(r.getSortOrder())
-                        .build())
+                        .build()))
                 .toList());
-        return plan;
     }
 
     /** One row per account that has a balance or an item this month, sorted by name. */
@@ -204,6 +225,7 @@ public class MonthService {
                 .accountName(item.getAccount().getName())
                 .amount(item.getAmount())
                 .billingDay(item.getBillingDay())
+                .inExpenditure(item.isInExpenditure())
                 .sortOrder(item.getSortOrder())
                 .status(item.getStatus())
                 .paidOn(item.getPaidOn())

@@ -64,6 +64,9 @@ public class MonthItem {
 	@Column(name = "billing_day")
 	private Integer billingDay;
 
+	/** Counts toward the month's Expenditure. */
+	@Column(name = "in_expenditure")
+	private boolean inExpenditure;
 	@Column(name = "sort_order")
 	private int sortOrder;
 

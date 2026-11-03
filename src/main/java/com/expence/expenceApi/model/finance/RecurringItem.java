@@ -19,7 +19,13 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * One row of the sheet's template: a bill or paycheck split entered once and copied into
@@ -56,11 +62,39 @@ public class RecurringItem {
 	@Column(name = "billing_day")
 	private Integer billingDay;
 
+	@Enumerated(EnumType.STRING)
+	@Builder.Default
+	private ItemFrequency frequency = ItemFrequency.MONTHLY;
+	/** TWICE_MONTHLY only: the second fixed day. */
+	@Column(name = "second_day")
+	private Integer secondDay;
+	/** BIWEEKLY and WEEKLY only: any known payday; the others are counted from it. */
+	@Column(name = "anchor_date")
+	private LocalDate anchorDate;
+	/** Counts toward the month's Expenditure. */
+	@Column(name = "in_expenditure")
+	private boolean inExpenditure;
 	@Column(name = "sort_order")
 	private int sortOrder;
 
 	@Builder.Default
 	private boolean active = true;
+
+	/** The days this item lands on in {@code month}; one null day for a monthly item with no fixed day. */
+	public List<Integer> daysIn(YearMonth month) {
+		return switch (frequency) {
+			case MONTHLY -> Collections.singletonList(billingDay);
+			case TWICE_MONTHLY -> List.of(billingDay, secondDay);
+			case BIWEEKLY, WEEKLY -> {
+				int step = frequency == ItemFrequency.WEEKLY ? 7 : 14;
+				LocalDate start = month.atDay(1);
+				LocalDate first = start.plusDays(Math.floorMod(ChronoUnit.DAYS.between(start, anchorDate), step));
+				yield Stream.iterate(first, d -> !d.isAfter(month.atEndOfMonth()), d -> d.plusDays(step))
+						.map(LocalDate::getDayOfMonth)
+						.toList();
+			}
+		};
+	}
 
 	/** Maintained by Postgres (column DEFAULT); Hibernate only reads it back. */
 	@Column(name = "created_at", insertable = false, updatable = false)

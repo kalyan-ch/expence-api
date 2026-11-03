@@ -21,6 +21,7 @@ public class RecurringItemService {
     private final RecurringItemRepository recurringItemRepository;
     private final MonthItemRepository monthItemRepository;
     private final AccountService accountService;
+    private final MonthService monthService;
 
     @Transactional(readOnly = true)
     public List<RecurringItemDTO> list() {
@@ -37,7 +38,9 @@ public class RecurringItemService {
         }
         RecurringItem item = RecurringItem.builder().name(name).build();
         apply(item, request);
-        return toDto(recurringItemRepository.save(item));
+        RecurringItem saved = recurringItemRepository.save(item);
+        monthService.addToOpenMonths(saved);
+        return toDto(saved);
     }
 
     @Transactional
@@ -73,8 +76,34 @@ public class RecurringItemService {
         item.setAccount(accountService.requirePayment(request.getAccountId(), item.getAccount()));
         item.setDefaultAmount(request.getDefaultAmount());
         item.setBillingDay(request.getBillingDay());
+        item.setInExpenditure(item.getKind().inExpenditure(request.getInExpenditure(), item.getId() == null ? null : item.isInExpenditure()));
+        applySchedule(item, request);
         if (request.getSortOrder() != null) item.setSortOrder(request.getSortOrder());
         if (request.getActive() != null) item.setActive(request.getActive());
+    }
+
+    /** Keeps only the fields the frequency uses, so the stored row always matches one schedule shape. */
+    private static void applySchedule(RecurringItem item, RecurringItemRequest request) {
+        if (request.getFrequency() != null) item.setFrequency(request.getFrequency());
+        item.setSecondDay(null);
+        item.setAnchorDate(null);
+        switch (item.getFrequency()) {
+            case MONTHLY -> { }
+            case TWICE_MONTHLY -> {
+                if (request.getBillingDay() == null || request.getSecondDay() == null
+                        || request.getBillingDay().equals(request.getSecondDay())) {
+                    throw new IllegalArgumentException("Twice a month needs two different days");
+                }
+                item.setSecondDay(request.getSecondDay());
+            }
+            case BIWEEKLY, WEEKLY -> {
+                if (request.getAnchorDate() == null) {
+                    throw new IllegalArgumentException("Pick a recent payday to count the weeks from");
+                }
+                item.setBillingDay(null);
+                item.setAnchorDate(request.getAnchorDate());
+            }
+        }
     }
 
     private static ConflictException duplicate(String name) {
@@ -90,6 +119,10 @@ public class RecurringItemService {
                 .accountName(item.getAccount().getName())
                 .defaultAmount(item.getDefaultAmount())
                 .billingDay(item.getBillingDay())
+                .inExpenditure(item.isInExpenditure())
+                .frequency(item.getFrequency())
+                .secondDay(item.getSecondDay())
+                .anchorDate(item.getAnchorDate())
                 .sortOrder(item.getSortOrder())
                 .active(item.isActive())
                 .build();

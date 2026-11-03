@@ -17,4 +17,6 @@ public interface PlanMonthRepository extends JpaRepository<PlanMonth, UUID> {
 
 	/** Oldest first: the order the trend chart draws. */
 	List<PlanMonth> findAllByOrderByMonthAsc();
+
+	List<PlanMonth> findAllByMonthGreaterThanEqual(LocalDate month);
 }

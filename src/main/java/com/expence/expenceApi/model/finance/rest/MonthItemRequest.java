@@ -50,4 +50,6 @@ public class MonthItemRequest {
     private ItemStatus status;
 
     private LocalDate paidOn;
+    /** Null keeps the current choice, or the kind's default on create. */
+    private Boolean inExpenditure;
 }

@@ -14,4 +14,6 @@ public interface MonthItemRepository extends JpaRepository<MonthItem, UUID> {
 
 	/** How many months copied this recurring item; a used item can only be retired. */
 	long countByRecurringItemId(UUID recurringItemId);
+
+	boolean existsByPlanMonthId(UUID planMonthId);
 }
