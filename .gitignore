@@ -39,3 +39,6 @@ build/
 
 ### Superpowers SDD scratch ###
 .superpowers/
+
+### Secrets ###
+.env

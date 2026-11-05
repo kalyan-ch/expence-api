@@ -53,7 +53,34 @@ The plan mirrors the spreadsheet it replaces:
 
 Amounts are stored as positive numbers; the kind decides the direction. A blank amount means nothing is due.
 
-## API
+## Bill reminders on Discord
+
+Each morning at 08:00 the API posts one digest to a Discord channel. It lists:
+- Bills that are overdue, due today or due in the next 3 days.
+- For each account, what it must cover before the next paycheck.
+
+A bill stops appearing once it is marked Paid. A day with nothing due sends nothing.
+
+1. In Discord, open Channel settings → Integrations → Webhooks, create one and copy its URL.
+2. Put the URL in an untracked `.env` (the URL lets anyone post to the channel, so it stays out of git), then start the API:
+   ```bash
+   cp .env.example .env    # then set DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/…
+   ./gradlew bootRun
+   ```
+   Spring reads `.env` on start; a real environment variable of the same name overrides it.
+3. Check it works:
+   ```bash
+   curl -X POST localhost:8081/api/notifications/test     # "Expence is connected"
+   curl -X POST localhost:8081/api/notifications/digest   # today's digest, now
+   ```
+
+Settings live under `app.notify` in `application.yml`:
+- `cron`: when the digest goes out.
+- `zone`: the time zone, or `NOTIFY_ZONE` in `.env`. It defaults to the machine's own.
+- `lead-days`: how far ahead to look.
+
+The digest only goes out while the API is running. If the API starts after the send time, it sends that day's digest straight away. A `notification_log` row makes sure no day is sent twice.
+
 
 All endpoints are under `/api`. Every month change returns the whole month, because one edit moves the totals.
 
@@ -64,6 +91,7 @@ All endpoints are under `/api`. Every month change returns the whole month, beca
 | Months | `GET /months` (list, for the switcher and trend chart), `GET /months/{yyyy-MM}` (fetch, creating if needed) |
 | Month rows | `POST /months/{month}/items`, `PUT/DELETE /months/{month}/items/{id}` |
 | Starting balances | `PUT /months/{month}/balances/{accountId}` |
+| Notifications | `POST /notifications/test`, `POST /notifications/digest`: 204 when sent, 409 with no webhook set, 502 if Discord refused it |
 | Phase 1 ledger | `/categories`, `/transactions`, `/reports/{summary,monthly,by-category}`: built first, not used by the bill plan |
 
 Validation errors return 400 with field errors, missing records 404, and conflicts 409.

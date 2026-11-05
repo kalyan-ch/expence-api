@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -53,6 +54,12 @@ public class MonthService {
     @Transactional
     public MonthDTO get(YearMonth month) {
         return view(plan(month));
+    }
+
+    /** A month as it stands, without creating it: for readers like reminders that must not open months. */
+    @Transactional(readOnly = true)
+    public Optional<MonthDTO> find(YearMonth month) {
+        return planMonthRepository.findByMonth(month.atDay(1)).map(this::view);
     }
 
     /** Adds a one-off row: not tied to a recurring item, so it never repeats. */
